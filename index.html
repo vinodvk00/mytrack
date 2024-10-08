@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyTrack - Time Tracking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Header -->
+    <header class="bg-blue-600 p-4 text-white text-center">
+        <h1 class="text-2xl font-bold">MyTrack - Time Tracking Application</h1>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto mt-8 p-4">
+
+        <!-- Task Form -->
+        <div class="bg-white p-6 rounded shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Log a New Task</h2>
+            <form id="taskForm" class="space-y-4">
+                <div>
+                    <label for="taskName" class="block font-medium">Task Name</label>
+                    <input type="text" id="taskName" class="w-full p-2 border rounded" placeholder="Enter task name" required>
+                </div>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Start Task</button>
+            </form>
+        </div>
+
+        <!-- Timeline View -->
+        <div class="bg-white p-6 rounded shadow-md mt-8">
+            <h2 class="text-xl font-semibold mb-4">Task Timeline</h2>
+            <ul id="taskTimeline" class="space-y-4"></ul>
+        </div>
+        
+    </div>
+
+    <script>
+        const taskForm = document.getElementById('taskForm');
+        const taskTimeline = document.getElementById('taskTimeline');
+
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        let taskIdCounter = tasks.length > 0 ? tasks[tasks.length - 1].id + 1 : 0;
+
+        // Helper function to format time as 'HH:MM'
+        function formatTime(date) {
+            return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        // Helper function to calculate time spent between start and end time
+        function calculateTimeSpent(startTime, endTime) {
+            const start = new Date(startTime);
+            const end = new Date(endTime);
+            const diffMs = end - start; // Difference in milliseconds
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+            return `${diffHours}h ${diffMinutes}m`;
+        }
+
+        // Save tasks to localStorage
+        function saveTasksToLocalStorage() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        // Function to render the task timeline
+        function renderTaskTimeline() {
+            taskTimeline.innerHTML = '';
+            tasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.classList.add('bg-gray-200', 'p-4', 'rounded', 'shadow', 'relative');
+
+                let timeSpent = '';
+                if (task.endTime) {
+                    timeSpent = calculateTimeSpent(task.startTime, task.endTime);
+                }
+
+                li.innerHTML = `
+                    <strong>${task.name}</strong><br>
+                    <small>Start: <span class="start-time">${formatTime(new Date(task.startTime))}</span></small><br>
+                    ${task.endTime ? `<small>End: <span class="end-time">${formatTime(new Date(task.endTime))}</span></small><br><strong>Time Spent: ${timeSpent}</strong>` : '<small>Ongoing...</small>'}
+                    <button class="bg-red-600 text-white px-2 py-1 rounded absolute top-4 right-32 end-task-btn" data-id="${index}">End Task</button>
+                    <button class="bg-yellow-500 text-white px-2 py-1 rounded absolute top-4 right-16 edit-task-btn" data-id="${index}">Edit</button>
+                `;
+                taskTimeline.appendChild(li);
+            });
+
+            // Attach event listeners for "End Task" and "Edit" buttons
+            document.querySelectorAll('.end-task-btn').forEach(btn => {
+                btn.addEventListener('click', handleEndTask);
+            });
+
+            document.querySelectorAll('.edit-task-btn').forEach(btn => {
+                btn.addEventListener('click', handleEditTask);
+            });
+        }
+
+        // Function to handle form submission (Start Task)
+        taskForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const taskName = document.getElementById('taskName').value;
+            const startTime = new Date();
+
+            const task = {
+                id: taskIdCounter++,
+                name: taskName,
+                startTime: startTime,
+                endTime: null
+            };
+
+            tasks.push(task);
+            saveTasksToLocalStorage();
+            renderTaskTimeline();
+
+            // Reset form
+            taskForm.reset();
+        });
+
+        // Function to handle ending a task
+        function handleEndTask(event) {
+            const taskId = event.target.dataset.id;
+            const task = tasks[taskId];
+
+            if (!task.endTime) {
+                task.endTime = new Date();
+                saveTasksToLocalStorage();
+                renderTaskTimeline();
+            } else {
+                alert('Task already ended.');
+            }
+        }
+
+        // Function to handle editing a task (task name, start time, and end time)
+        function handleEditTask(event) {
+            const taskId = event.target.dataset.id;
+            const task = tasks[taskId];
+
+            // Edit task name
+            const newTaskName = prompt('Edit task name:', task.name);
+            if (newTaskName) {
+                task.name = newTaskName;
+            }
+
+            // Edit start time
+            const newStartTime = prompt('Edit start time (HH:MM):', formatTime(new Date(task.startTime)));
+            if (newStartTime) {
+                const [hours, minutes] = newStartTime.split(':');
+                const startDateTime = new Date(task.startTime);
+                startDateTime.setHours(hours);
+                startDateTime.setMinutes(minutes);
+                task.startTime = startDateTime;
+            }
+
+            // Edit end time (if task has ended)
+            if (task.endTime) {
+                const newEndTime = prompt('Edit end time (HH:MM):', formatTime(new Date(task.endTime)));
+                if (newEndTime) {
+                    const [hours, minutes] = newEndTime.split(':');
+                    const endDateTime = new Date(task.endTime);
+                    endDateTime.setHours(hours);
+                    endDateTime.setMinutes(minutes);
+                    task.endTime = endDateTime;
+                }
+            }
+
+            saveTasksToLocalStorage();
+            renderTaskTimeline();
+        }
+
+        // Initial rendering on page load
+        renderTaskTimeline();
+    </script>
+
+</body>
+</html>
